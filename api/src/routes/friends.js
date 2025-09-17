@@ -3,7 +3,84 @@ const { auth } = require('../middleware/auth');
 const User = require('../models/User');
 const FriendRequest = require('../models/FriendRequest');
 
-// gửi lời mời
+/**
+ * @swagger
+ * /friends/request:
+ *   post:
+ *     summary: Send a friend request
+ *     tags: [Friends]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [toUserId]
+ *             properties:
+ *               toUserId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Friend request sent
+ *       400:
+ *         description: Invalid target
+ *       409:
+ *         description: Already sent
+ */
+
+/**
+ * @swagger
+ * /friends/accept:
+ *   post:
+ *     summary: Accept a friend request
+ *     tags: [Friends]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fromUserId]
+ *             properties:
+ *               fromUserId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Friend request accepted
+ *       400:
+ *         description: No request
+ */
+
+/**
+ * @swagger
+ * /friends/list:
+ *   get:
+ *     summary: List my friends
+ *     tags: [Friends]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of friends
+ */
+
+/**
+ * @swagger
+ * /friends/pending:
+ *   get:
+ *     summary: List pending friend requests
+ *     tags: [Friends]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of pending requests
+ */
+
 router.post('/request', auth, async (req, res) => {
   const { toUserId } = req.body;
   if (toUserId === req.user.id) return res.status(400).json({ error: 'Invalid target' });

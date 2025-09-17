@@ -3,7 +3,73 @@ const { auth } = require('../middleware/auth');
 const Conversation = require('../models/Conversation');
 const User = require('../models/User');
 
-// tạo / lấy hội thoại 1-1 (ensure)
+/**
+ * @swagger
+ * /conversations/single:
+ *   post:
+ *     summary: Create or get a single (1-1) conversation
+ *     tags: [Conversations]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [otherUserId]
+ *             properties:
+ *               otherUserId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Conversation object
+ *       400:
+ *         description: Bad request
+ */
+
+/**
+ * @swagger
+ * /conversations/group:
+ *   post:
+ *     summary: Create a group conversation
+ *     tags: [Conversations]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, memberIds]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               memberIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Group conversation created
+ *       400:
+ *         description: Group needs >= 3 members
+ */
+
+/**
+ * @swagger
+ * /conversations/my:
+ *   get:
+ *     summary: List my conversations
+ *     tags: [Conversations]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of conversations
+ */
+
 router.post('/single', auth, async (req, res) => {
   const { otherUserId } = req.body;
   // tìm nếu đã có
@@ -21,7 +87,6 @@ router.post('/single', auth, async (req, res) => {
   res.json(conv);
 });
 
-// tạo group
 router.post('/group', auth, async (req, res) => {
   const { name, memberIds } = req.body; // memberIds: không bao gồm mình
   const members = Array.from(new Set([req.user.id, ...(memberIds || [])]));
@@ -37,7 +102,6 @@ router.post('/group', auth, async (req, res) => {
   res.json(conv);
 });
 
-// list hội thoại của mình
 router.get('/my', auth, async (req, res) => {
   const list = await Conversation.find({ members: req.user.id })
     .sort({ updatedAt: -1 })
