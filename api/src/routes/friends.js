@@ -81,6 +81,30 @@ const FriendRequest = require('../models/FriendRequest');
  *         description: List of pending requests
  */
 
+/**
+ * @swagger
+ * /friends/{friendId}:
+ *   delete:
+ *     summary: Remove a friend (unfriend)
+ *     tags: [Friends]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: friendId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of friend to remove
+ *     responses:
+ *       200:
+ *         description: Friend removed
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Friend not found
+ */
+
 router.post('/request', auth, async (req, res) => {
   const { toUserId } = req.body;
   if (toUserId === req.user.id) return res.status(400).json({ error: 'Invalid target' });
@@ -126,6 +150,32 @@ router.get('/list', auth, async (req, res) => {
 router.get('/pending', auth, async (req, res) => {
   const items = await FriendRequest.find({ to: req.user.id, status: 'pending' }).populate('from', '_id username avatar');
   res.json(items);
+});
+
+// Huỷ kết bạn (unfriend)
+router.delete('/:friendId', auth, async (req, res) => {
+  const { friendId } = req.params;
+  if (!friendId) return res.status(400).json({ error: 'friendId required' });
+
+  const me = await User.findById(req.user.id).select('friends');
+  if (!me) return res.status(404).json({ error: 'User not found' });
+
+  const isFriend = me.friends.map(String).includes(String(friendId));
+  if (!isFriend) return res.status(404).json({ error: 'Friend not found' });
+
+  // remove friend from both users
+  await User.findByIdAndUpdate(req.user.id, { $pull: { friends: friendId } });
+  await User.findByIdAndUpdate(friendId, { $pull: { friends: req.user.id } });
+
+  // remove any friend requests between them
+  await FriendRequest.deleteMany({
+    $or: [
+      { from: req.user.id, to: friendId },
+      { from: friendId, to: req.user.id }
+    ]
+  });
+
+  res.json({ ok: true });
 });
 
 module.exports = router;
