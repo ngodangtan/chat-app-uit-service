@@ -179,8 +179,15 @@ router.post('/accept', auth, async (req, res) => {
 
 // list bạn
 router.get('/list', auth, async (req, res) => {
-  const me = await User.findById(req.user.id).populate('friends', '_id username email avatar');
-  res.json(me?.friends || []);
+  // populate friends then normalize fields to match mobile User model
+  const me = await User.findById(req.user.id).populate('friends', '_id username email avatar').lean();
+  const friends = (me?.friends || []).map(u => ({
+    id: String(u._id || u.id),
+    username: u.username || '',
+    email: u.email || '',
+    avatar: u.avatar ? String(u.avatar) : null
+  }));
+  res.json(friends);
 });
 
 // pending requests (mình là người nhận)
