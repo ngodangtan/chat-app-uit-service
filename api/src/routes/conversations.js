@@ -70,14 +70,40 @@ const User = require('../models/User');
  *         description: List of conversations
  */
 
+const mapUser = (u) => {
+  if (!u) return null;
+  return {
+    id: String(u._id || u.id),
+    username: u.username || '',
+    email: u.email || '',
+    avatar: u.avatar ? String(u.avatar) : null
+  };
+};
+
+const normalizeConversation = (conv) => {
+  return {
+    id: String(conv._id || conv.id),
+    type: conv.type,
+    name: conv.name || null,
+    members: (conv.members || []).map(mapUser),
+    admins: (conv.admins || []).map(mapUser),
+    lastMessageAt: conv.lastMessageAt || null,
+    createdAt: conv.createdAt,
+    updatedAt: conv.updatedAt
+  };
+};
+
 router.post('/single', auth, async (req, res) => {
   const { otherUserId, userId } = req.body;
   const targetId = otherUserId || userId; // ← chấp nhận cả 2
+  if (!targetId) return res.status(400).json({ error: 'target required' });
+
   // tìm nếu đã có
   let conv = await Conversation.findOne({
     type: 'single',
     members: { $all: [req.user.id, targetId], $size: 2 }
   });
+
   if (!conv) {
     conv = await Conversation.create({
       type: 'single',
@@ -85,7 +111,14 @@ router.post('/single', auth, async (req, res) => {
       lastMessageAt: new Date()
     });
   }
-  res.json(conv);
+
+  // populate members/admins to match mobile User model
+  const populated = await Conversation.findById(conv._id)
+    .populate('members', '_id username email avatar')
+    .populate('admins', '_id username email avatar')
+    .lean();
+
+  res.json(normalizeConversation(populated));
 });
 
 router.post('/group', auth, async (req, res) => {
@@ -100,14 +133,23 @@ router.post('/group', auth, async (req, res) => {
     admins: [req.user.id],
     lastMessageAt: new Date()
   });
-  res.json(conv);
+
+  const populated = await Conversation.findById(conv._id)
+    .populate('members', '_id username email avatar')
+    .populate('admins', '_id username email avatar')
+    .lean();
+
+  res.json(normalizeConversation(populated));
 });
 
 router.get('/my', auth, async (req, res) => {
   const list = await Conversation.find({ members: req.user.id })
     .sort({ updatedAt: -1 })
+    .populate('members', '_id username email avatar')
+    .populate('admins', '_id username email avatar')
     .lean();
-  res.json(list);
+
+  res.json((list || []).map(normalizeConversation));
 });
 
 module.exports = router;
