@@ -71,16 +71,17 @@ const User = require('../models/User');
  */
 
 router.post('/single', auth, async (req, res) => {
-  const { otherUserId } = req.body;
+  const { otherUserId, userId } = req.body;
+  const targetId = otherUserId || userId; // ← chấp nhận cả 2
   // tìm nếu đã có
   let conv = await Conversation.findOne({
     type: 'single',
-    members: { $all: [req.user.id, otherUserId], $size: 2 }
+    members: { $all: [req.user.id, targetId], $size: 2 }
   });
   if (!conv) {
     conv = await Conversation.create({
       type: 'single',
-      members: [req.user.id, otherUserId],
+      members: [req.user.id, targetId],
       lastMessageAt: new Date()
     });
   }
