@@ -141,16 +141,38 @@ router.post('/request', auth, async (req, res) => {
 
 // accept lời mời (người nhận chấp nhận)
 router.post('/accept', auth, async (req, res) => {
-  const { fromUserId } = req.body;
-  const fr = await FriendRequest.findOne({ from: fromUserId, to: req.user.id });
-  if (!fr || fr.status !== 'pending') return res.status(400).json({ error: 'No request' });
+  const { fromUserId, requestId } = req.body;
+
+  if (!fromUserId && !requestId) {
+    return res.status(400).json({ error: 'fromUserId or requestId required' });
+  }
+
+  let fr = null;
+  if (requestId) {
+    fr = await FriendRequest.findById(requestId);
+  } else {
+    // try treat fromUserId as sender user id
+    fr = await FriendRequest.findOne({ from: fromUserId, to: req.user.id });
+    if (!fr) {
+      // maybe client sent the friend-request record id in fromUserId
+      try {
+        fr = await FriendRequest.findById(fromUserId);
+      } catch (e) {
+        fr = null;
+      }
+    }
+  }
+
+  if (!fr || String(fr.to) !== String(req.user.id) || fr.status !== 'pending') {
+    return res.status(400).json({ error: 'No request' });
+  }
 
   fr.status = 'accepted';
   await fr.save();
 
-  // add vào friends của cả 2
-  await User.findByIdAndUpdate(req.user.id, { $addToSet: { friends: fromUserId } });
-  await User.findByIdAndUpdate(fromUserId,   { $addToSet: { friends: req.user.id } });
+  // add into friends for both users
+  await User.findByIdAndUpdate(req.user.id, { $addToSet: { friends: fr.from } });
+  await User.findByIdAndUpdate(fr.from,   { $addToSet: { friends: req.user.id } });
 
   res.json({ ok: true });
 });
