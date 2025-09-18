@@ -7,7 +7,7 @@ const FriendRequest = require('../models/FriendRequest');
  * @swagger
  * /friends/request:
  *   post:
- *     summary: Send a friend request
+ *     summary: Send a friend request (by email)
  *     tags: [Friends]
  *     security:
  *       - bearerAuth: []
@@ -17,15 +17,18 @@ const FriendRequest = require('../models/FriendRequest');
  *         application/json:
  *           schema:
  *             type: object
- *             required: [toUserId]
+ *             required: [email]
  *             properties:
- *               toUserId:
+ *               email:
  *                 type: string
+ *                 format: email
  *     responses:
  *       200:
  *         description: Friend request sent
  *       400:
  *         description: Invalid target
+ *       404:
+ *         description: User not found
  *       409:
  *         description: Already sent
  */
@@ -106,20 +109,32 @@ const FriendRequest = require('../models/FriendRequest');
  */
 
 router.post('/request', auth, async (req, res) => {
-  const { toUserId } = req.body;
-  if (toUserId === req.user.id) return res.status(400).json({ error: 'Invalid target' });
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+
+  // find user by email
+  const target = await User.findOne({ email: (email || '').toLowerCase().trim() });
+  if (!target) return res.status(404).json({ error: 'User not found' });
+
+  if (String(target._id) === String(req.user.id)) return res.status(400).json({ error: 'Invalid target' });
 
   try {
-    const exists = await FriendRequest.findOne({ from: req.user.id, to: toUserId });
+    // if already friends
+    const me = await User.findById(req.user.id).select('friends');
+    if (me && me.friends.map(String).includes(String(target._id))) {
+      return res.status(400).json({ error: 'Already friends' });
+    }
+
+    const exists = await FriendRequest.findOne({ from: req.user.id, to: target._id });
     if (exists && exists.status === 'pending') return res.status(409).json({ error: 'Already sent' });
 
     const fr = await FriendRequest.findOneAndUpdate(
-      { from: req.user.id, to: toUserId },
+      { from: req.user.id, to: target._id },
       { $set: { status: 'pending' } },
       { upsert: true, new: true }
     );
     res.json(fr);
-  } catch {
+  } catch (err) {
     res.status(500).json({ error: 'Failed' });
   }
 });
