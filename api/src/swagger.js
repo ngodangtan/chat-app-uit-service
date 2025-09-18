@@ -19,6 +19,7 @@ const options = {
         User: {
           type: 'object',
           properties: {
+            _id: { type: 'string' },           // added to match real responses
             id: { type: 'string' },
             username: { type: 'string' },
             email: { type: 'string' },
@@ -28,10 +29,25 @@ const options = {
         FriendRequest: {
           type: 'object',
           properties: {
-            id: { type: 'string' },
-            from: { $ref: '#/components/schemas/User' },
-            to: { $ref: '#/components/schemas/User' },
-            status: { type: 'string', enum: ['pending','accepted','rejected','canceled'] }
+            _id: { type: 'string' },
+            id: { type: 'string', nullable: true },
+            from: {
+              oneOf: [
+                { $ref: '#/components/schemas/User' },
+                { type: 'string', format: 'objectId' }
+              ],
+              description: 'Sender user object (populated) or user id'
+            },
+            to: {
+              oneOf: [
+                { $ref: '#/components/schemas/User' },
+                { type: 'string', format: 'objectId' }
+              ],
+              description: 'Recipient user object (populated) or user id'
+            },
+            status: { type: 'string', enum: ['pending','accepted','rejected','canceled'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' }
           }
         },
         Conversation: {

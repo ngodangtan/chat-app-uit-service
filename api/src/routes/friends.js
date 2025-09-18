@@ -163,8 +163,38 @@ router.get('/list', auth, async (req, res) => {
 
 // pending requests (mình là người nhận)
 router.get('/pending', auth, async (req, res) => {
-  const items = await FriendRequest.find({ to: req.user.id, status: 'pending' }).populate('from', '_id username avatar');
-  res.json(items);
+  // populate both from and to with email/avatar so client can parse
+  const items = await FriendRequest.find({ to: req.user.id, status: 'pending' })
+    .populate('from', '_id username email avatar')
+    .populate('to',   '_id username email avatar')
+    .lean();
+
+  const normalized = (items || []).map(it => {
+    const mapUser = (u) => {
+      if (!u) return null;
+      return {
+        id: String(u._id || u.id),
+        username: u.username || '',
+        email: u.email || '',
+        avatar: u.avatar || null
+      };
+    };
+
+    // map backend statuses to client enum (client supports: pending, accepted, rejected)
+    let status = it.status;
+    if (status === 'canceled') status = 'rejected';
+
+    return {
+      id: String(it._id || it.id),
+      from: mapUser(it.from),
+      to: mapUser(it.to),
+      status,
+      createdAt: it.createdAt,
+      updatedAt: it.updatedAt
+    };
+  });
+
+  res.json(normalized);
 });
 
 // Huỷ kết bạn (unfriend)
