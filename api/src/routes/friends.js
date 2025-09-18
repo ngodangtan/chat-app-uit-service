@@ -126,14 +126,49 @@ router.post('/request', auth, async (req, res) => {
     }
 
     const exists = await FriendRequest.findOne({ from: req.user.id, to: target._id });
-    if (exists && exists.status === 'pending') return res.status(409).json({ error: 'Already sent' });
+
+    // helper to normalize populated user -> mobile model
+    const mapUser = (u) => {
+      if (!u) return null;
+      return {
+        id: String(u._id || u.id),
+        username: u.username || '',
+        email: u.email || '',
+        avatar: u.avatar ? String(u.avatar) : null
+      };
+    };
+
+    if (exists && exists.status === 'pending') {
+      const populated = await FriendRequest.findById(exists._id)
+        .populate('from', '_id username email avatar')
+        .populate('to',   '_id username email avatar')
+        .lean();
+
+      return res.json({
+        id: String(populated._id),
+        from: mapUser(populated.from),
+        to:   mapUser(populated.to),
+        status: populated.status
+      });
+    }
 
     const fr = await FriendRequest.findOneAndUpdate(
       { from: req.user.id, to: target._id },
       { $set: { status: 'pending' } },
       { upsert: true, new: true }
     );
-    res.json(fr);
+
+    const populated = await FriendRequest.findById(fr._id)
+      .populate('from', '_id username email avatar')
+      .populate('to',   '_id username email avatar')
+      .lean();
+
+    res.json({
+      id: String(populated._id),
+      from: mapUser(populated.from),
+      to:   mapUser(populated.to),
+      status: populated.status
+    });
   } catch (err) {
     res.status(500).json({ error: 'Failed' });
   }
